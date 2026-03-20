@@ -13,14 +13,15 @@ class AppServiceProvider extends ServiceProvider
     {
         $modules = glob(app_path('Modules/*/Providers/*ServiceProvider.php'));
         foreach ($modules as $file) {
+            // Normalize to backslashes for class name resolution
+            $normalized = str_replace('/', DIRECTORY_SEPARATOR, $file);
+            $appPath    = str_replace('/', DIRECTORY_SEPARATOR, app_path());
             $class = str_replace(
-                [app_path() . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR, '.php'],
+                [$appPath . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR, '.php'],
                 ['App\\', '\\', ''],
-                $file
+                $normalized
             );
-            if (class_exists($class)) {
-                $this->app->register($class);
-            }
+            $this->app->register($class);
         }
     }
 
