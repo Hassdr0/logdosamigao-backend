@@ -3,6 +3,8 @@ namespace App\Modules\Admin\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Players\Player;
+use App\Modules\Sync\SyncService;
+use App\Modules\SyncLogs\SyncLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
@@ -49,16 +51,36 @@ class AdminController extends Controller
         return response()->json(['message' => 'Player removed']);
     }
 
-    public function syncAll(): JsonResponse
+    public function syncAll(SyncService $syncService): JsonResponse
     {
-        // Implementado no Plano 2 (WCL Sync)
-        return response()->json(['message' => 'Sync enqueued', 'status' => 'pending']);
+        $results = $syncService->syncAll();
+
+        return response()->json([
+            'message' => 'Sync global concluído',
+            'results' => $results,
+        ]);
     }
 
-    public function syncPlayer(int $id): JsonResponse
+    public function syncPlayer(int $id, SyncService $syncService): JsonResponse
     {
-        $player = Player::findOrFail($id);
-        // Implementado no Plano 2 (WCL Sync)
-        return response()->json(['message' => "Sync enqueued for {$player->name}", 'status' => 'pending']);
+        $player  = \App\Modules\Players\Player::findOrFail($id);
+        $syncLog = $syncService->syncPlayer($player);
+
+        return response()->json([
+            'message'  => "Sync concluído para {$player->name}",
+            'status'   => $syncLog->status,
+            'reports'  => $syncLog->reports_fetched,
+            'errors'   => $syncLog->error_message,
+        ]);
+    }
+
+    public function syncLogs(): JsonResponse
+    {
+        $logs = SyncLog::with('player')
+            ->orderByDesc('synced_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json(['logs' => $logs]);
     }
 }
