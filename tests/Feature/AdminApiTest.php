@@ -56,4 +56,64 @@ class AdminApiTest extends TestCase
         $response->assertStatus(200);
         $this->assertDatabaseMissing('players', ['id' => $player->id]);
     }
+
+    public function test_admin_sync_all_returns_results(): void
+    {
+        $token = $this->loginAndGetToken();
+
+        $response = $this->postJson('/api/admin/sync', [], [
+            'Authorization' => "Bearer $token",
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJsonStructure(['message', 'results'])
+                 ->assertJsonPath('results.total', 0);
+    }
+
+    public function test_admin_sync_player_returns_sync_status(): void
+    {
+        $token  = $this->loginAndGetToken();
+        $player = \App\Modules\Players\Player::factory()->create(['name' => 'Arthemion', 'realm' => 'azralon', 'region' => 'US']);
+
+        \Illuminate\Support\Facades\Http::fake([
+            'www.warcraftlogs.com/oauth/token' => \Illuminate\Support\Facades\Http::response([
+                'access_token' => 'fake-token',
+            ], 200),
+            'www.warcraftlogs.com/api/v2/client' => \Illuminate\Support\Facades\Http::response([
+                'data' => [
+                    'characterData' => [
+                        'character' => [
+                            'recentReports' => ['data' => []],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->postJson("/api/admin/sync/{$player->id}", [], [
+            'Authorization' => "Bearer $token",
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJsonStructure(['message', 'status', 'reports', 'errors'])
+                 ->assertJsonPath('status', 'success');
+    }
+
+    public function test_admin_sync_logs_returns_list(): void
+    {
+        $token = $this->loginAndGetToken();
+
+        $response = $this->getJson('/api/admin/sync/logs', [
+            'Authorization' => "Bearer $token",
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJsonStructure(['logs']);
+    }
+
+    public function test_admin_sync_requires_token(): void
+    {
+        $response = $this->postJson('/api/admin/sync');
+        $response->assertStatus(401);
+    }
 }
