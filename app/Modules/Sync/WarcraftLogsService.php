@@ -39,13 +39,13 @@ class WarcraftLogsService
         string $name,
         string $realm,
         string $region,
-        float $startTime
+        float $startTime = 0
     ): array {
         $query = <<<'GQL'
-        query GetCharacterReports($name: String!, $realm: String!, $region: String!, $startTime: Float!) {
+        query GetCharacterReports($name: String!, $realm: String!, $region: String!) {
           characterData {
-            character(name: $name, realmSlug: $realm, region: $region) {
-              recentReports(limit: 25, startTime: $startTime) {
+            character(name: $name, serverSlug: $realm, serverRegion: $region) {
+              recentReports(limit: 25) {
                 data {
                   code
                   startTime
@@ -59,10 +59,9 @@ class WarcraftLogsService
         GQL;
 
         $response = $this->graphql($query, [
-            'name'      => $name,
-            'realm'     => $realm,
-            'region'    => $region,
-            'startTime' => $startTime,
+            'name'   => $name,
+            'realm'  => $realm,
+            'region' => $region,
         ]);
 
         return $response['data']['characterData']['character']['recentReports']['data'] ?? [];
@@ -76,16 +75,12 @@ class WarcraftLogsService
             report(code: $code) {
               startTime
               zone { name }
-              rankings(playerMetric: dps) {
-                data {
-                  name
-                  class
-                  spec
-                  rankPercent
-                  amount
-                  gear { itemLevel }
-                  bestAmount
-                }
+              rankings(playerMetric: dps)
+              fights(killType: Kills) {
+                id
+                name
+                difficulty
+                kill
               }
             }
           }

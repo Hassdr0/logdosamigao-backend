@@ -94,37 +94,47 @@ class SyncService
             throw new \RuntimeException("Empty response for report {$code}");
         }
 
-        $rankings  = $reportData['rankings']['data'] ?? [];
+        // rankings é JSON: { data: [ { encounter: {name}, difficulty, roles: {dps: {characters: []}} } ] }
+        $bosses    = $reportData['rankings']['data'] ?? [];
         $zoneName  = $reportData['zone']['name']     ?? 'Unknown';
         $startTime = $reportData['startTime']        ?? (time() * 1000);
+
+        // Determinar dificuldade (3=Heroic, 4=Mythic, 1=LFR, 2=Normal)
+        $difficultyId  = $bosses[0]['difficulty'] ?? 2;
+        $difficultyMap = [1 => 'lfr', 2 => 'normal', 3 => 'heroic', 4 => 'mythic'];
+        $difficulty    = $difficultyMap[$difficultyId] ?? 'normal';
 
         $raid = Raid::updateOrCreate(
             ['wcl_report_id' => $code],
             [
                 'instance_name' => $zoneName,
-                'difficulty'    => 'mythic',
+                'difficulty'    => $difficulty,
                 'date'          => date('Y-m-d', (int) ($startTime / 1000)),
-                'bosses_killed' => count($rankings),
+                'bosses_killed' => count($bosses),
                 'total_bosses'  => 8,
                 'wcl_url'       => 'https://www.warcraftlogs.com/reports/' . $code,
             ]
         );
 
-        $playerEntry = collect($rankings)->firstWhere('name', $player->name);
+        $spec      = '';
+        $itemLevel = 0;
+        $found     = false;
 
-        if (!$playerEntry) {
-            return;
-        }
+        foreach ($bosses as $bossData) {
+            $bossName   = $bossData['encounter']['name'] ?? 'Unknown Boss';
+            $dpsPlayers = $bossData['roles']['dps']['characters'] ?? [];
 
-        $itemLevel = $playerEntry['gear']['itemLevel'] ?? 0;
-        $spec      = strtolower($playerEntry['spec']   ?? '');
+            $playerEntry = collect($dpsPlayers)
+                ->first(fn($p) => strtolower($p['name']) === strtolower($player->name));
 
-        foreach ($rankings as $bossRanking) {
-            if (($bossRanking['name'] ?? '') !== $player->name) {
+            if (!$playerEntry) {
                 continue;
             }
 
-            $bossName = $bossRanking['boss'] ?? 'Unknown Boss';
+            $found     = true;
+            $spec      = strtolower($playerEntry['spec'] ?? $spec);
+            // bracketData é o ilvl aproximado (bracket de ilvl)
+            $itemLevel = (int) ($playerEntry['bracketData'] ?? $itemLevel);
 
             Performance::updateOrCreate(
                 [
@@ -133,9 +143,9 @@ class SyncService
                     'boss_name' => $bossName,
                 ],
                 [
-                    'dps_best'     => (int) ($bossRanking['bestAmount'] ?? 0),
-                    'dps_avg'      => (int) ($bossRanking['amount']     ?? 0),
-                    'parse_pct'    => (int) ($bossRanking['rankPercent'] ?? 0),
+                    'dps_best'     => (int) ($playerEntry['amount'] ?? 0),
+                    'dps_avg'      => (int) ($playerEntry['amount'] ?? 0),
+                    'parse_pct'    => (int) ($playerEntry['rankPercent'] ?? 0),
                     'ilvl_at_time' => $itemLevel,
                     'spec_at_time' => $spec,
                     'kills'        => 1,
@@ -143,11 +153,23 @@ class SyncService
             );
         }
 
+        if (!$found) {
+            return;
+        }
+
+        if ($spec) {
+            $player->spec = $spec;
+        }
         if ($itemLevel > 0) {
             $player->item_level = $itemLevel;
         }
-        if ($spec) {
-            $player->spec = $spec;
+
+        // Atualizar classe do player
+        $dpsPlayers  = $bosses[0]['roles']['dps']['characters'] ?? [];
+        $playerEntry = collect($dpsPlayers)
+            ->first(fn($p) => strtolower($p['name']) === strtolower($player->name));
+        if ($playerEntry && !empty($playerEntry['class'])) {
+            $player->class = strtolower($playerEntry['class']);
         }
     }
 
