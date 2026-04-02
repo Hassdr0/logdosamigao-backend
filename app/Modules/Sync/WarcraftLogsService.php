@@ -45,7 +45,7 @@ class WarcraftLogsService
         query GetCharacterReports($name: String!, $realm: String!, $region: String!) {
           characterData {
             character(name: $name, serverSlug: $realm, serverRegion: $region) {
-              recentReports(limit: 25) {
+              recentReports(limit: 100) {
                 data {
                   code
                   startTime
@@ -90,6 +90,30 @@ class WarcraftLogsService
         $response = $this->graphql($query, ['code' => $code]);
 
         return $response['data']['reportData']['report'] ?? [];
+    }
+
+    public function getMythicPlusRankings(string $name, string $realm, string $region): array
+    {
+        $season   = config('wcl.current_season', 'midnight_s1');
+        $zoneId   = config("wcl.seasons.{$season}.mplus_zone_id", 47);
+
+        $query = <<<GQL
+        query GetMythicPlus(\$name: String!, \$realm: String!, \$region: String!) {
+          characterData {
+            character(name: \$name, serverSlug: \$realm, serverRegion: \$region) {
+              zoneRankings(zoneID: {$zoneId})
+            }
+          }
+        }
+        GQL;
+
+        $response = $this->graphql($query, [
+            'name'   => $name,
+            'realm'  => $realm,
+            'region' => $region,
+        ]);
+
+        return $response['data']['characterData']['character']['zoneRankings'] ?? [];
     }
 
     private function graphql(string $query, array $variables = []): array

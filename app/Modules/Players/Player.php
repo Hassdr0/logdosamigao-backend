@@ -30,4 +30,9 @@ class Player extends Model
     {
         return $this->hasMany(\App\Modules\Performances\Performance::class);
     }
+
+    public function dungeonRuns()
+    {
+        return $this->hasMany(\App\Modules\Dungeons\DungeonRun::class);
+    }
 }

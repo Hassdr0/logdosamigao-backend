@@ -74,6 +74,37 @@ class AdminController extends Controller
         ]);
     }
 
+    public function syncMythicPlus(int $id, SyncService $syncService): JsonResponse
+    {
+        $player = Player::findOrFail($id);
+        try {
+            $saved = $syncService->syncMythicPlusOnly($player);
+            return response()->json(['message' => "M+ sync OK para {$player->name}", 'dungeons_saved' => $saved]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => "M+ sync falhou para {$player->name}", 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function syncMythicPlusAll(SyncService $syncService): JsonResponse
+    {
+        $players = Player::where('is_active', true)->get();
+        $errors = [];
+        $total_saved = 0;
+        foreach ($players as $player) {
+            try {
+                $total_saved += $syncService->syncMythicPlusOnly($player);
+            } catch (\Throwable $e) {
+                $errors[] = "{$player->name}: " . $e->getMessage();
+            }
+        }
+        return response()->json([
+            'message'      => 'M+ sync global ' . (empty($errors) ? 'OK' : 'parcial'),
+            'total'        => $players->count(),
+            'dungeons_saved' => $total_saved,
+            'errors'       => $errors,
+        ]);
+    }
+
     public function syncLogs(): JsonResponse
     {
         $logs = SyncLog::with('player')

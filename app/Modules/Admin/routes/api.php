@@ -10,6 +10,8 @@ Route::middleware(AdminTokenMiddleware::class)->group(function () {
     Route::post('admin/players',        'AdminController@createPlayer');
     Route::delete('admin/players/{id}', 'AdminController@deletePlayer');
     Route::get('admin/sync/logs',       'AdminController@syncLogs');
-    Route::post('admin/sync',           'AdminController@syncAll');
-    Route::post('admin/sync/{id}',      'AdminController@syncPlayer');
+    Route::post('admin/sync',              'AdminController@syncAll');
+    Route::post('admin/sync/{id}',         'AdminController@syncPlayer');
+    Route::post('admin/sync-mplus',        'AdminController@syncMythicPlusAll');
+    Route::post('admin/sync-mplus/{id}',   'AdminController@syncMythicPlus');
 });
