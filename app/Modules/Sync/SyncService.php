@@ -37,12 +37,19 @@ class SyncService
                 ? (float) ($player->last_synced_at->timestamp * 1000)
                 : (float) (now()->subDays(90)->timestamp * 1000);
 
-            $reports = $this->wcl->getCharacterReports(
+            $charData = $this->wcl->getCharacterReports(
                 $player->name,
                 $player->realm,
                 $player->region,
                 $startTime
             );
+            $reports   = $charData['reports']    ?? [];
+            $gearScore = (int) ($charData['gear_score'] ?? 0);
+
+            // Atualiza ilvl real do personagem se disponível
+            if ($gearScore > 0) {
+                $player->item_level = $gearScore;
+            }
 
             // Códigos já processados: guardados no error_message do sync_log como JSON, ou como wcl_report_id das raids
             $processedCodes = \Illuminate\Support\Facades\DB::table('sync_logs')
