@@ -7,7 +7,7 @@ class DungeonRun extends Model
 {
     protected $fillable = [
         'player_id', 'dungeon_name', 'key_level',
-        'score', 'rank_percent', 'total_runs', 'spec',
+        'score', 'rank_percent', 'median_percent', 'best_dps', 'total_runs', 'spec',
         'server_rank', 'region_rank', 'world_rank', 'best_time_ms',
     ];
 

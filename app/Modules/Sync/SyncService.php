@@ -304,27 +304,31 @@ class SyncService
             $totalRuns   = (int) ($rk['totalKills'] ?? 0);
             if (!$dungeonName || $totalRuns === 0) continue;
 
-            $keyLevel   = (int)   ($rk['bestRank']['ilvl']      ?? 0);
-            $score      = (float) ($rk['bestAmount']             ?? 0);
-            $parse      = (float) ($rk['rankPercent']            ?? 0);
-            $spec       = strtolower($rk['spec']                 ?? '');
-            $serverRank = (int)   ($rk['allStars']['serverRank'] ?? 0);
-            $regionRank = (int)   ($rk['allStars']['regionRank'] ?? 0);
-            $worldRank  = (int)   ($rk['allStars']['rank']       ?? 0);
-            $bestTimeMs = (int)   ($rk['bestRank']['speed']      ?? 0);
+            $keyLevel      = (int)   ($rk['bestRank']['ilvl']         ?? 0);
+            $score         = (float) ($rk['bestAmount']                ?? 0);
+            $parse         = (float) ($rk['rankPercent']               ?? 0);
+            $medianPercent = (float) ($rk['medianPercent']             ?? 0);
+            $bestDps       = (int)   ($rk['bestRank']['totalDamage']   ?? 0);
+            $spec          = strtolower($rk['spec']                    ?? '');
+            $serverRank    = (int)   ($rk['allStars']['serverRank']    ?? 0);
+            $regionRank    = (int)   ($rk['allStars']['regionRank']    ?? 0);
+            $worldRank     = (int)   ($rk['allStars']['rank']          ?? 0);
+            $bestTimeMs    = (int)   ($rk['bestRank']['duration']      ?? 0);
 
             DungeonRun::updateOrCreate(
                 ['player_id' => $player->id, 'dungeon_name' => $dungeonName],
                 [
-                    'key_level'    => $keyLevel,
-                    'score'        => $score,
-                    'rank_percent' => $parse,
-                    'total_runs'   => $totalRuns,
-                    'spec'         => $spec,
-                    'server_rank'  => $serverRank,
-                    'region_rank'  => $regionRank,
-                    'world_rank'   => $worldRank,
-                    'best_time_ms' => $bestTimeMs,
+                    'key_level'      => $keyLevel,
+                    'score'          => $score,
+                    'rank_percent'   => $parse,
+                    'median_percent' => $medianPercent,
+                    'best_dps'       => $bestDps,
+                    'total_runs'     => $totalRuns,
+                    'spec'           => $spec,
+                    'server_rank'    => $serverRank,
+                    'region_rank'    => $regionRank,
+                    'world_rank'     => $worldRank,
+                    'best_time_ms'   => $bestTimeMs,
                 ]
             );
             $saved++;
