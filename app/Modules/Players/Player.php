@@ -35,4 +35,14 @@ class Player extends Model
     {
         return $this->hasMany(\App\Modules\Dungeons\DungeonRun::class);
     }
+
+    public function keystones()
+    {
+        return $this->hasMany(PlayerKeystone::class);
+    }
+
+    public function raidProgress()
+    {
+        return $this->hasMany(PlayerRaidProgress::class);
+    }
 }

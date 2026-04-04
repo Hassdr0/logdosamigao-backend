@@ -2,6 +2,8 @@
 namespace App\Modules\Sync;
 
 use App\Modules\Players\Player;
+use App\Modules\Players\PlayerKeystone;
+use App\Modules\Players\PlayerRaidProgress;
 use App\Modules\Raids\Raid;
 use App\Modules\Performances\Performance;
 use App\Modules\Dungeons\DungeonRun;
@@ -88,15 +90,47 @@ class SyncService
             $this->updatePlayerFromLatestPerformance($player);
             $this->syncMythicPlus($player);
 
-            // Atualiza ilvl real e avatar via API da Blizzard
+            // Atualiza ilvl real, avatar e spec via API da Blizzard
             $blizzData = $this->blizzard->getCharacterData($player->name, $player->realm, $player->region);
             if ($blizzData) {
-                if (!empty($blizzData['item_level'])) {
-                    $player->item_level = $blizzData['item_level'];
-                }
-                if (!empty($blizzData['avatar_url'])) {
-                    $player->avatar_url = $blizzData['avatar_url'];
-                }
+                if (!empty($blizzData['item_level'])) $player->item_level = $blizzData['item_level'];
+                if (!empty($blizzData['avatar_url']))  $player->avatar_url = $blizzData['avatar_url'];
+                if (!empty($blizzData['spec']))        $player->spec       = $blizzData['spec'];
+            }
+
+            // Keystones da season atual
+            $keystoneRuns = $this->blizzard->getKeystoneRuns($player->name, $player->realm, $player->region);
+            foreach ($keystoneRuns as $run) {
+                PlayerKeystone::updateOrCreate(
+                    [
+                        'player_id'    => $player->id,
+                        'dungeon_name' => $run['dungeon_name'],
+                        'completed_at' => $run['completed_at'],
+                        'key_level'    => $run['key_level'],
+                    ],
+                    [
+                        'season_id'   => 1,
+                        'duration_ms' => $run['duration_ms'],
+                        'timed'       => $run['timed'],
+                        'week'        => 0,
+                    ]
+                );
+            }
+
+            // Progressão de raid (Blizzard oficial)
+            $raidProgress = $this->blizzard->getRaidProgress($player->name, $player->realm, $player->region);
+            foreach ($raidProgress as $prog) {
+                PlayerRaidProgress::updateOrCreate(
+                    [
+                        'player_id'     => $player->id,
+                        'instance_name' => $prog['instance_name'],
+                        'difficulty'    => $prog['difficulty'],
+                    ],
+                    [
+                        'bosses_killed' => $prog['bosses_killed'],
+                        'total_bosses'  => $prog['total_bosses'],
+                    ]
+                );
             }
 
             $player->last_synced_at = now();

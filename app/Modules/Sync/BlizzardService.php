@@ -96,18 +96,140 @@ class BlizzardService
                 }
             }
 
-            if (!$itemLevel && !$avatarUrl) {
+            // Spec ativa via specializations
+            $specRes = Http::withToken($token)
+                ->get("{$host}/profile/wow/character/{$realmSlug}/{$nameLower}/specializations", [
+                    'namespace' => $namespace,
+                    'locale'    => 'pt_BR',
+                ]);
+            $activeSpec = null;
+            if ($specRes->successful()) {
+                $activeSpec = $specRes->json('active_specialization.name') ?? null;
+            }
+
+            if (!$itemLevel && !$avatarUrl && !$activeSpec) {
                 return null;
             }
 
             return array_filter([
                 'item_level' => $itemLevel,
                 'avatar_url' => $avatarUrl,
+                'spec'       => $activeSpec ? strtolower($activeSpec) : null,
             ]);
 
         } catch (\Throwable $e) {
             Log::warning("BlizzardService: falha ao buscar {$name}-{$realm}: " . $e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Busca runs de keystone da season atual.
+     * Retorna array de runs: [dungeon_name, key_level, duration_ms, timed, completed_at, week]
+     */
+    public function getKeystoneRuns(string $name, string $realm, string $region, int $seasonId = 1): array
+    {
+        $region    = strtolower($region);
+        $namespace = 'dynamic-' . (self::REGION_NAMESPACE[$region] ?? 'us');
+        $host      = self::REGION_HOST[$region] ?? self::REGION_HOST['us'];
+        $realmSlug = strtolower(str_replace("'", '', str_replace(' ', '-', $realm)));
+        $nameLower = strtolower($name);
+
+        try {
+            $token    = $this->getToken();
+            $response = Http::withToken($token)
+                ->get("{$host}/profile/wow/character/{$realmSlug}/{$nameLower}/mythic-keystone-profile/season/{$seasonId}", [
+                    'namespace' => $namespace,
+                    'locale'    => 'pt_BR',
+                ]);
+
+            if (!$response->successful()) return [];
+
+            $bestRuns = $response->json('best_runs') ?? [];
+            $runs = [];
+
+            foreach ($bestRuns as $run) {
+                $runs[] = [
+                    'dungeon_name' => $run['dungeon']['name'] ?? 'Unknown',
+                    'key_level'    => (int) ($run['keystone_level'] ?? 0),
+                    'duration_ms'  => (int) ($run['duration'] ?? 0),
+                    'timed'        => (bool) ($run['is_completed_within_time'] ?? false),
+                    'completed_at' => isset($run['completed_timestamp'])
+                        ? date('Y-m-d', (int) ($run['completed_timestamp'] / 1000))
+                        : null,
+                    'week'         => (int) ($run['mythic_rating']['rating'] ?? 0), // semana calculável
+                ];
+            }
+
+            return $runs;
+
+        } catch (\Throwable $e) {
+            Log::warning("BlizzardService: keystone falhou para {$name}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Busca progressão de raid por dificuldade via encounters/raids.
+     * Retorna array: [instance_name, difficulty, bosses_killed, total_bosses]
+     */
+    public function getRaidProgress(string $name, string $realm, string $region): array
+    {
+        $region    = strtolower($region);
+        $namespace = 'dynamic-' . (self::REGION_NAMESPACE[$region] ?? 'us');
+        $host      = self::REGION_HOST[$region] ?? self::REGION_HOST['us'];
+        $realmSlug = strtolower(str_replace("'", '', str_replace(' ', '-', $realm)));
+        $nameLower = strtolower($name);
+
+        // Raids da season atual (Midnight S1)
+        $currentRaids = ['Voidspire', 'Dreamrift', "March on Quel'Danas"];
+
+        try {
+            $token    = $this->getToken();
+            $response = Http::withToken($token)
+                ->get("{$host}/profile/wow/character/{$realmSlug}/{$nameLower}/encounters/raids", [
+                    'namespace' => $namespace,
+                    'locale'    => 'pt_BR',
+                ]);
+
+            if (!$response->successful()) return [];
+
+            $expansions = $response->json('expansions') ?? [];
+            $result = [];
+
+            foreach ($expansions as $expansion) {
+                $instances = $expansion['instances'] ?? [];
+                foreach ($instances as $instance) {
+                    $instanceName = $instance['instance']['name'] ?? '';
+                    if (!in_array($instanceName, $currentRaids)) continue;
+
+                    $modes = $instance['modes'] ?? [];
+                    foreach ($modes as $mode) {
+                        $diffLabel = strtolower($mode['difficulty']['type'] ?? '');
+                        $diffMap   = ['NORMAL' => 'normal', 'HEROIC' => 'heroic', 'MYTHIC' => 'mythic', 'LFR' => 'lfr'];
+                        $diff      = $diffMap[strtoupper($diffLabel)] ?? $diffLabel;
+
+                        $progress     = $mode['progress'] ?? [];
+                        $bossesKilled = (int) ($progress['completed_count'] ?? 0);
+                        $totalBosses  = (int) ($progress['total_count'] ?? 0);
+
+                        if ($totalBosses === 0) continue;
+
+                        $result[] = [
+                            'instance_name' => $instanceName,
+                            'difficulty'    => $diff,
+                            'bosses_killed' => $bossesKilled,
+                            'total_bosses'  => $totalBosses,
+                        ];
+                    }
+                }
+            }
+
+            return $result;
+
+        } catch (\Throwable $e) {
+            Log::warning("BlizzardService: raid progress falhou para {$name}: " . $e->getMessage());
+            return [];
         }
     }
 }

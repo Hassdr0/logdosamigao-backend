@@ -17,6 +17,11 @@ class PlayerController extends Controller
     public function show(string $realm, string $name): JsonResponse
     {
         $player = $this->service->findByRealmAndName($realm, $name);
-        return response()->json(['player' => $player->load('performances.raid', 'dungeonRuns')]);
+        return response()->json(['player' => $player->load(
+            'performances.raid',
+            'dungeonRuns',
+            'keystones',
+            'raidProgress'
+        )]);
     }
 }
