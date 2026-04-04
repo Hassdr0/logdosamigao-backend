@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Log;
 class SyncService
 {
     public function __construct(
-        private WarcraftLogsService $wcl
+        private WarcraftLogsService $wcl,
+        private BlizzardService $blizzard
     ) {}
 
     public function syncAll(): array
@@ -86,6 +87,18 @@ class SyncService
 
             $this->updatePlayerFromLatestPerformance($player);
             $this->syncMythicPlus($player);
+
+            // Atualiza ilvl real e avatar via API da Blizzard
+            $blizzData = $this->blizzard->getCharacterData($player->name, $player->realm, $player->region);
+            if ($blizzData) {
+                if (!empty($blizzData['item_level'])) {
+                    $player->item_level = $blizzData['item_level'];
+                }
+                if (!empty($blizzData['avatar_url'])) {
+                    $player->avatar_url = $blizzData['avatar_url'];
+                }
+            }
+
             $player->last_synced_at = now();
             $player->save();
 

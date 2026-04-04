@@ -1,0 +1,5 @@
+<?php
+return [
+    'client_id'     => env('BLIZZARD_CLIENT_ID'),
+    'client_secret' => env('BLIZZARD_CLIENT_SECRET'),
+];
