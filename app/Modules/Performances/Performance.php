@@ -17,15 +17,17 @@ class Performance extends Model
     protected $fillable = [
         'player_id', 'raid_id', 'boss_name',
         'dps_best', 'dps_avg', 'hps', 'parse_pct',
-        'ilvl_at_time', 'spec_at_time', 'kills',
+        'ilvl_at_time', 'spec_at_time', 'kills', 'kill_count',
     ];
 
     protected $casts = [
         'dps_best'     => 'integer',
         'dps_avg'      => 'integer',
+        'hps'          => 'integer',
         'parse_pct'    => 'integer',
         'ilvl_at_time' => 'integer',
         'kills'        => 'integer',
+        'kill_count'   => 'integer',
     ];
 
     public function player()

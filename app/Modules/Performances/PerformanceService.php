@@ -31,6 +31,7 @@ class PerformanceService
             'players.spec',
             'players.item_level',
             DB::raw('AVG(performances.dps_avg) as avg_dps'),
+            DB::raw('AVG(performances.hps) as avg_hps'),
             DB::raw('SUM(performances.kills) as total_kills'),
             DB::raw('COUNT(DISTINCT performances.raid_id) as total_raids')
         );
@@ -87,6 +88,7 @@ class PerformanceService
                 'spec'               => $row->spec,
                 'item_level'         => $row->item_level,
                 'avg_dps'            => (int) round($row->avg_dps),
+                'avg_hps'            => (int) round($row->avg_hps ?? 0),
                 'avg_parse'          => $mainParse,
                 'parse_by_difficulty'=> $byDiff,
                 'total_kills'        => (int) $row->total_kills,

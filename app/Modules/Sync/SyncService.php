@@ -169,10 +169,19 @@ class SyncService
             }
             $raid = $raidCache[$raidKey];
 
-            $dpsPlayers = $bossData['roles']['dps']['characters'] ?? [];
+            // Tentar encontrar player em DPS ou healers
+            $dpsPlayers    = $bossData['roles']['dps']['characters']     ?? [];
+            $healerPlayers = $bossData['roles']['healers']['characters'] ?? [];
 
             $playerEntry = collect($dpsPlayers)
                 ->first(fn($p) => strtolower($p['name']) === strtolower($player->name));
+
+            $isHealer = false;
+            if (!$playerEntry) {
+                $playerEntry = collect($healerPlayers)
+                    ->first(fn($p) => strtolower($p['name']) === strtolower($player->name));
+                $isHealer = (bool) $playerEntry;
+            }
 
             if (!$playerEntry) {
                 continue;
@@ -180,11 +189,12 @@ class SyncService
 
             $found     = true;
             $spec      = strtolower($playerEntry['spec'] ?? $spec);
-            // bracketData é o ilvl aproximado (bracket de ilvl)
             $itemLevel = (int) ($playerEntry['bracketData'] ?? $itemLevel);
 
-            $newDps   = (int) ($playerEntry['amount'] ?? 0);
+            $amount   = (int) ($playerEntry['amount'] ?? 0);
             $newParse = (int) ($playerEntry['rankPercent'] ?? 0);
+            $newDps   = $isHealer ? 0 : $amount;
+            $newHps   = $isHealer ? $amount : 0;
 
             $existing = Performance::where([
                 'player_id' => $player->id,
@@ -193,12 +203,18 @@ class SyncService
             ])->first();
 
             if ($existing) {
-                // Mesmo boss na mesma raid = múltiplos reports da mesma noite, não kills extras
-                $existing->dps_best     = max($existing->dps_best, $newDps);
-                $existing->dps_avg      = (int) (($existing->dps_avg + $newDps) / 2);
+                // Média incremental correta: avg = avg + (new - avg) / count
+                $newCount = $existing->kill_count + 1;
+                if ($isHealer) {
+                    $existing->hps = (int) round($existing->hps + ($newHps - $existing->hps) / $newCount);
+                } else {
+                    $existing->dps_avg  = (int) round($existing->dps_avg + ($newDps - $existing->dps_avg) / $newCount);
+                    $existing->dps_best = max($existing->dps_best, $newDps);
+                }
                 $existing->parse_pct    = max($existing->parse_pct, $newParse);
                 $existing->ilvl_at_time = max($existing->ilvl_at_time, $itemLevel);
                 $existing->spec_at_time = $spec ?: $existing->spec_at_time;
+                $existing->kill_count   = $newCount;
                 $existing->save();
             } else {
                 Performance::create([
@@ -207,15 +223,18 @@ class SyncService
                     'boss_name'    => $bossName,
                     'dps_best'     => $newDps,
                     'dps_avg'      => $newDps,
+                    'hps'          => $newHps,
                     'parse_pct'    => $newParse,
                     'ilvl_at_time' => $itemLevel,
                     'spec_at_time' => $spec,
                     'kills'        => 1,
+                    'kill_count'   => 1,
                 ]);
             }
 
             // Atualiza bosses_killed da raid agrupada
-            $raid->bosses_killed = Performance::where('raid_id', $raid->id)->count();
+            $raid->bosses_killed = Performance::where('raid_id', $raid->id)
+                ->where('player_id', $player->id)->count();
             $raid->save();
         }
 
