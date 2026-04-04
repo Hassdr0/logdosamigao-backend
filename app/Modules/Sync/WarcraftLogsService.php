@@ -121,7 +121,7 @@ class WarcraftLogsService
         return $response['data']['characterData']['character']['zoneRankings'] ?? [];
     }
 
-    private function graphql(string $query, array $variables = []): array
+    private function graphql(string $query, array $variables = [], int $attempt = 1): array
     {
         $token = $this->getToken();
 
@@ -130,6 +130,14 @@ class WarcraftLogsService
                 'query'     => $query,
                 'variables' => $variables,
             ]);
+
+        // Rate limit — backoff exponencial, máx 3 tentativas (2s, 4s, 8s)
+        if ($response->status() === 429 && $attempt <= 3) {
+            $waitSeconds = (int) pow(2, $attempt);
+            Log::info("WCL rate limit, aguardando {$waitSeconds}s (tentativa {$attempt}/3)");
+            sleep($waitSeconds);
+            return $this->graphql($query, $variables, $attempt + 1);
+        }
 
         if ($response->failed()) {
             throw new \RuntimeException(
