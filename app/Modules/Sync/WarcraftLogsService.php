@@ -129,10 +129,11 @@ class WarcraftLogsService
                 'variables' => $variables,
             ]);
 
-        // Rate limit — backoff exponencial, máx 3 tentativas (2s, 4s, 8s)
-        if ($response->status() === 429 && $attempt <= 3) {
-            $waitSeconds = (int) pow(2, $attempt);
-            Log::info("WCL rate limit, aguardando {$waitSeconds}s (tentativa {$attempt}/3)");
+        // Rate limit — backoff fixo, máx 4 tentativas (5s, 15s, 30s, 60s)
+        $waitMap = [1 => 5, 2 => 15, 3 => 30, 4 => 60];
+        if ($response->status() === 429 && isset($waitMap[$attempt])) {
+            $waitSeconds = $waitMap[$attempt];
+            Log::info("WCL rate limit, aguardando {$waitSeconds}s (tentativa {$attempt}/4)");
             sleep($waitSeconds);
             return $this->graphql($query, $variables, $attempt + 1);
         }
