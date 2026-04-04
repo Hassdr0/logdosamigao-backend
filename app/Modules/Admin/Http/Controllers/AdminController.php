@@ -105,6 +105,20 @@ class AdminController extends Controller
         ]);
     }
 
+    public function updateAvatar(int $id, Request $request): JsonResponse
+    {
+        $request->validate(['image' => 'required|image|max:2048']);
+        $player = Player::findOrFail($id);
+
+        $file    = $request->file('image');
+        $mime    = $file->getMimeType();
+        $base64  = base64_encode(file_get_contents($file->getRealPath()));
+        $player->avatar_url = "data:{$mime};base64,{$base64}";
+        $player->save();
+
+        return response()->json(['avatar_url' => $player->avatar_url]);
+    }
+
     public function syncLogs(): JsonResponse
     {
         $logs = SyncLog::with('player')

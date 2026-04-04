@@ -14,4 +14,5 @@ Route::middleware(AdminTokenMiddleware::class)->group(function () {
     Route::post('admin/sync/{id}',         'AdminController@syncPlayer');
     Route::post('admin/sync-mplus',        'AdminController@syncMythicPlusAll');
     Route::post('admin/sync-mplus/{id}',   'AdminController@syncMythicPlus');
+    Route::post('admin/players/{id}/avatar', 'AdminController@updateAvatar');
 });
