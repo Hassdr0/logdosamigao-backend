@@ -14,7 +14,8 @@ class SyncService
 {
     public function __construct(
         private WarcraftLogsService $wcl,
-        private BlizzardService $blizzard
+        private BlizzardService $blizzard,
+        private RaiderIOService $raiderIO
     ) {}
 
     public function syncAll(): array
@@ -90,47 +91,61 @@ class SyncService
             $this->updatePlayerFromLatestPerformance($player);
             $this->syncMythicPlus($player);
 
-            // Atualiza ilvl real, avatar e spec via API da Blizzard
-            $blizzData = $this->blizzard->getCharacterData($player->name, $player->realm, $player->region);
-            if ($blizzData) {
-                if (!empty($blizzData['item_level'])) $player->item_level = $blizzData['item_level'];
-                if (!empty($blizzData['avatar_url']))  $player->avatar_url = $blizzData['avatar_url'];
-                if (!empty($blizzData['spec']))        $player->spec       = $blizzData['spec'];
+            // Atualiza dados via API da Blizzard (falha silenciosa se credenciais ausentes)
+            try {
+                $blizzData = $this->blizzard->getCharacterData($player->name, $player->realm, $player->region);
+                if ($blizzData) {
+                    if (!empty($blizzData['item_level'])) $player->item_level = $blizzData['item_level'];
+                    if (!empty($blizzData['avatar_url']))  $player->avatar_url = $blizzData['avatar_url'];
+                    if (!empty($blizzData['spec']))        $player->spec       = $blizzData['spec'];
+                }
+
+                $keystoneRuns = $this->blizzard->getKeystoneRuns($player->name, $player->realm, $player->region);
+                foreach ($keystoneRuns as $run) {
+                    PlayerKeystone::updateOrCreate(
+                        [
+                            'player_id'    => $player->id,
+                            'dungeon_name' => $run['dungeon_name'],
+                            'completed_at' => $run['completed_at'],
+                            'key_level'    => $run['key_level'],
+                        ],
+                        [
+                            'season_id'   => 1,
+                            'duration_ms' => $run['duration_ms'],
+                            'timed'       => $run['timed'],
+                            'week'        => 0,
+                        ]
+                    );
+                }
+
+                $raidProgress = $this->blizzard->getRaidProgress($player->name, $player->realm, $player->region);
+                foreach ($raidProgress as $prog) {
+                    PlayerRaidProgress::updateOrCreate(
+                        [
+                            'player_id'     => $player->id,
+                            'instance_name' => $prog['instance_name'],
+                            'difficulty'    => $prog['difficulty'],
+                        ],
+                        [
+                            'bosses_killed' => $prog['bosses_killed'],
+                            'total_bosses'  => $prog['total_bosses'],
+                        ]
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning("SyncService: Blizzard sync falhou para {$player->name}: " . $e->getMessage());
             }
 
-            // Keystones da season atual
-            $keystoneRuns = $this->blizzard->getKeystoneRuns($player->name, $player->realm, $player->region);
-            foreach ($keystoneRuns as $run) {
-                PlayerKeystone::updateOrCreate(
-                    [
-                        'player_id'    => $player->id,
-                        'dungeon_name' => $run['dungeon_name'],
-                        'completed_at' => $run['completed_at'],
-                        'key_level'    => $run['key_level'],
-                    ],
-                    [
-                        'season_id'   => 1,
-                        'duration_ms' => $run['duration_ms'],
-                        'timed'       => $run['timed'],
-                        'week'        => 0,
-                    ]
-                );
-            }
-
-            // Progressão de raid (Blizzard oficial)
-            $raidProgress = $this->blizzard->getRaidProgress($player->name, $player->realm, $player->region);
-            foreach ($raidProgress as $prog) {
-                PlayerRaidProgress::updateOrCreate(
-                    [
-                        'player_id'     => $player->id,
-                        'instance_name' => $prog['instance_name'],
-                        'difficulty'    => $prog['difficulty'],
-                    ],
-                    [
-                        'bosses_killed' => $prog['bosses_killed'],
-                        'total_bosses'  => $prog['total_bosses'],
-                    ]
-                );
+            // Raider.IO: score M+ por spec (público, sem chave)
+            try {
+                $rio = $this->raiderIO->getScores($player->name, $player->realm, $player->region);
+                if ($rio) {
+                    $player->rio_score          = $rio['score'];
+                    $player->rio_score_color     = $rio['color'];
+                    $player->rio_scores_by_spec  = $rio['scores_by_spec'];
+                }
+            } catch (\Throwable $e) {
+                Log::warning("SyncService: Raider.IO sync falhou para {$player->name}: " . $e->getMessage());
             }
 
             $player->last_synced_at = now();

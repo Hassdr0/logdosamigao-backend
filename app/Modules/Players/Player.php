@@ -18,12 +18,15 @@ class Player extends Model
         'name', 'realm', 'region', 'class', 'spec',
         'item_level', 'wcl_character_id', 'avatar_url',
         'is_active', 'last_synced_at',
+        'rio_score', 'rio_score_color', 'rio_scores_by_spec',
     ];
 
     protected $casts = [
-        'is_active'      => 'boolean',
-        'last_synced_at' => 'datetime',
-        'item_level'     => 'integer',
+        'is_active'          => 'boolean',
+        'last_synced_at'     => 'datetime',
+        'item_level'         => 'integer',
+        'rio_score'          => 'float',
+        'rio_scores_by_spec' => 'array',
     ];
 
     public function performances()

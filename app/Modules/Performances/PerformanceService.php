@@ -30,6 +30,8 @@ class PerformanceService
             'players.class',
             'players.spec',
             'players.item_level',
+            'players.rio_score',
+            'players.rio_score_color',
             DB::raw('AVG(performances.dps_avg) as avg_dps'),
             DB::raw('AVG(performances.hps) as avg_hps'),
             DB::raw('SUM(performances.kills) as total_kills'),
@@ -39,7 +41,7 @@ class PerformanceService
             $aggQuery->where('raids.difficulty', $difficultyFilter);
         }
         $agg = $aggQuery
-            ->groupBy('players.id','players.name','players.realm','players.class','players.spec','players.item_level')
+            ->groupBy('players.id','players.name','players.realm','players.class','players.spec','players.item_level','players.rio_score','players.rio_score_color')
             ->orderByDesc('avg_dps')
             ->get()
             ->keyBy('id');
@@ -87,6 +89,8 @@ class PerformanceService
                 'class'              => $row->class,
                 'spec'               => $row->spec,
                 'item_level'         => $row->item_level,
+                'rio_score'          => (float) ($row->rio_score ?? 0),
+                'rio_score_color'    => $row->rio_score_color ?? '#ffffff',
                 'avg_dps'            => (int) round($row->avg_dps),
                 'avg_hps'            => (int) round($row->avg_hps ?? 0),
                 'avg_parse'          => $mainParse,
