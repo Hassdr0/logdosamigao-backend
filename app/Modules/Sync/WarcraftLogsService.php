@@ -45,7 +45,6 @@ class WarcraftLogsService
         query GetCharacterReports($name: String!, $realm: String!, $region: String!) {
           characterData {
             character(name: $name, serverSlug: $realm, serverRegion: $region) {
-              gearScore
               recentReports(limit: 100) {
                 data {
                   code
@@ -67,8 +66,7 @@ class WarcraftLogsService
 
         $char = $response['data']['characterData']['character'] ?? [];
         return [
-            'reports'    => $char['recentReports']['data'] ?? [],
-            'gear_score' => (int) ($char['gearScore'] ?? 0),
+            'reports' => $char['recentReports']['data'] ?? [],
         ];
     }
 

@@ -47,13 +47,7 @@ class SyncService
                 $player->region,
                 $startTime
             );
-            $reports   = $charData['reports']    ?? [];
-            $gearScore = (int) ($charData['gear_score'] ?? 0);
-
-            // Atualiza ilvl real do personagem se disponível
-            if ($gearScore > 0) {
-                $player->item_level = $gearScore;
-            }
+            $reports = $charData['reports'] ?? [];
 
             // Códigos já processados: guardados no error_message do sync_log como JSON, ou como wcl_report_id das raids
             $processedCodes = \Illuminate\Support\Facades\DB::table('sync_logs')
